@@ -19,7 +19,7 @@
 
 set -e
 
-VERSION=2.3.0
+VERSION=2.3.0.1
 HADOOP_PROFILE=2.8
 #HADOOP_VERSION=2.7.3
 #SCALA_VERSION=2.7
@@ -35,7 +35,7 @@ if [ $# -gt 1 ] || [ "$1" != "deploy" ] ; then
 fi
 
 
-./dev/make-distribution.sh --name "without-hadoop" --tgz "-Pyarn,hadoop-provided,hadoop-${HADOOP_PROFILE},parquet-provided"
+./dev/make-distribution.sh --name "without-hadoop-with-hive" --tgz "-Phive,hive-thriftserver,yarn,hadoop-provided,hadoop-${HADOOP_PROFILE},parquet-provided"
 
 if [ "$1" == "deploy" ] ; then
    echo "scp spark-${VERSION}-bin-without-hadoop.tgz to  glassfish@snurran.sics.se:/var/www/hops"

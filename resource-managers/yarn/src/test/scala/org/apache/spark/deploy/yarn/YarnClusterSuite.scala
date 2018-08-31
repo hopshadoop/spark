@@ -114,12 +114,25 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
       ))
   }
 
-  test("yarn-cluster should respect conf overrides in SparkHadoopUtil (SPARK-16414)") {
+  test("yarn-cluster should respect conf overrides in SparkHadoopUtil (SPARK-16414, SPARK-23630)") {
+    // Create a custom hadoop config file, to make sure it's contents are propagated to the driver.
+    val customConf = Utils.createTempDir()
+    val coreSite = """<?xml version="1.0" encoding="UTF-8"?>
+      |<configuration>
+      |  <property>
+      |    <name>spark.test.key</name>
+      |    <value>testvalue</value>
+      |  </property>
+      |</configuration>
+      |""".stripMargin
+    Files.write(coreSite, new File(customConf, "core-site.xml"), StandardCharsets.UTF_8)
+
     val result = File.createTempFile("result", null, tempDir)
     val finalState = runSpark(false,
       mainClassName(YarnClusterDriverUseSparkHadoopUtilConf.getClass),
-      appArgs = Seq("key=value", result.getAbsolutePath()),
-      extraConf = Map("spark.hadoop.key" -> "value"))
+      appArgs = Seq("key=value", "spark.test.key=testvalue", result.getAbsolutePath()),
+      extraConf = Map("spark.hadoop.key" -> "value"),
+      extraEnv = Map("SPARK_TEST_HADOOP_CONF_DIR" -> customConf.getAbsolutePath()))
     checkResult(finalState, result)
   }
 
@@ -244,22 +257,17 @@ class YarnClusterSuite extends BaseYarnClusterSuite {
     // needed locations.
     val sparkHome = sys.props("spark.test.home")
     val pythonPath = Seq(
-        s"$sparkHome/python/lib/py4j-0.10.6-src.zip",
+        s"$sparkHome/python/lib/py4j-0.10.7-src.zip",
         s"$sparkHome/python")
     val extraEnvVars = Map(
       "PYSPARK_ARCHIVES_PATH" -> pythonPath.map("local:" + _).mkString(File.pathSeparator),
       "PYTHONPATH" -> pythonPath.mkString(File.pathSeparator)) ++ extraEnv
 
-    val moduleDir =
-      if (clientMode) {
-        // In client-mode, .py files added with --py-files are not visible in the driver.
-        // This is something that the launcher library would have to handle.
-        tempDir
-      } else {
-        val subdir = new File(tempDir, "pyModules")
-        subdir.mkdir()
-        subdir
-      }
+    val moduleDir = {
+      val subdir = new File(tempDir, "pyModules")
+      subdir.mkdir()
+      subdir
+    }
     val pyModule = new File(moduleDir, "mod1.py")
     Files.write(TEST_PYMODULE, pyModule, StandardCharsets.UTF_8)
 
@@ -319,13 +327,13 @@ private object YarnClusterDriverWithFailure extends Logging with Matchers {
 
 private object YarnClusterDriverUseSparkHadoopUtilConf extends Logging with Matchers {
   def main(args: Array[String]): Unit = {
-    if (args.length != 2) {
+    if (args.length < 2) {
       // scalastyle:off println
       System.err.println(
         s"""
         |Invalid command line: ${args.mkString(" ")}
         |
-        |Usage: YarnClusterDriverUseSparkHadoopUtilConf [hadoopConfKey=value] [result file]
+        |Usage: YarnClusterDriverUseSparkHadoopUtilConf [hadoopConfKey=value]+ [result file]
         """.stripMargin)
       // scalastyle:on println
       System.exit(1)
@@ -335,11 +343,16 @@ private object YarnClusterDriverUseSparkHadoopUtilConf extends Logging with Matc
       .set("spark.extraListeners", classOf[SaveExecutorInfo].getName)
       .setAppName("yarn test using SparkHadoopUtil's conf"))
 
-    val kv = args(0).split("=")
-    val status = new File(args(1))
+    val kvs = args.take(args.length - 1).map { kv =>
+      val parsed = kv.split("=")
+      (parsed(0), parsed(1))
+    }
+    val status = new File(args.last)
     var result = "failure"
     try {
-      SparkHadoopUtil.get.conf.get(kv(0)) should be (kv(1))
+      kvs.foreach { case (k, v) =>
+        SparkHadoopUtil.get.conf.get(k) should be (v)
+      }
       result = "success"
     } finally {
       Files.write(result, status, StandardCharsets.UTF_8)

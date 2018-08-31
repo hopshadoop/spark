@@ -28,6 +28,7 @@ import org.scalatest.Matchers._
 
 import org.apache.spark.SparkException
 import org.apache.spark.sql.catalyst.TableIdentifier
+import org.apache.spark.sql.catalyst.expressions.Uuid
 import org.apache.spark.sql.catalyst.plans.logical.{Filter, OneRowRelation, Union}
 import org.apache.spark.sql.execution.{FilterExec, QueryExecution, WholeStageCodegenExec}
 import org.apache.spark.sql.execution.aggregate.HashAggregateExec
@@ -2263,5 +2264,15 @@ class DataFrameSuite extends QueryTest with SharedSQLContext {
     val df = spark.range(1).select(expr1, expr2.otherwise(0))
     checkAnswer(df, Row(0, 10) :: Nil)
     assert(df.queryExecution.executedPlan.isInstanceOf[WholeStageCodegenExec])
+  }
+
+  test("Uuid expressions should produce same results at retries in the same DataFrame") {
+    val df = spark.range(1).select($"id", new Column(Uuid()))
+    checkAnswer(df, df.collect())
+  }
+
+  test("SPARK-24313: access map with binary keys") {
+    val mapWithBinaryKey = map(lit(Array[Byte](1.toByte)), lit(1))
+    checkAnswer(spark.range(1).select(mapWithBinaryKey.getItem(Array[Byte](1.toByte))), Row(1))
   }
 }

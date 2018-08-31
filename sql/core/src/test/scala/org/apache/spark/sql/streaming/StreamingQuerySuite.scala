@@ -532,22 +532,22 @@ class StreamingQuerySuite extends StreamTest with BeforeAndAfter with Logging wi
         .start()
     }
 
-    val input = MemoryStream[Int]
-    val q1 = startQuery(input.toDS, "stream_serializable_test_1")
-    val q2 = startQuery(input.toDS.map { i =>
+    val input = MemoryStream[Int] :: MemoryStream[Int] :: MemoryStream[Int] :: Nil
+    val q1 = startQuery(input(0).toDS, "stream_serializable_test_1")
+    val q2 = startQuery(input(1).toDS.map { i =>
       // Emulate that `StreamingQuery` get captured with normal usage unintentionally.
       // It should not fail the query.
       q1
       i
     }, "stream_serializable_test_2")
-    val q3 = startQuery(input.toDS.map { i =>
+    val q3 = startQuery(input(2).toDS.map { i =>
       // Emulate that `StreamingQuery` is used in executors. We should fail the query with a clear
       // error message.
       q1.explain()
       i
     }, "stream_serializable_test_3")
     try {
-      input.addData(1)
+      input.foreach(_.addData(1))
 
       // q2 should not fail since it doesn't use `q1` in the closure
       q2.processAllAvailable()
@@ -685,6 +685,21 @@ class StreamingQuerySuite extends StreamTest with BeforeAndAfter with Logging wi
     testStream(otherDf, OutputMode.Complete())(
       AddData(stream, (1, 1), (2, 4)),
       CheckLastBatch(("A", 1)))
+  }
+
+  test("StreamingRelationV2/StreamingExecutionRelation/ContinuousExecutionRelation.toJSON " +
+    "should not fail") {
+    val df = spark.readStream.format("rate").load()
+    assert(df.logicalPlan.toJSON.contains("StreamingRelationV2"))
+
+    testStream(df)(
+      AssertOnQuery(_.logicalPlan.toJSON.contains("StreamingExecutionRelation"))
+    )
+
+    testStream(df, useV2Sink = true)(
+      StartStream(trigger = Trigger.Continuous(100)),
+      AssertOnQuery(_.logicalPlan.toJSON.contains("ContinuousExecutionRelation"))
+    )
   }
 
   /** Create a streaming DF that only execute one batch in which it returns the given static DF */

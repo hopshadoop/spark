@@ -389,7 +389,7 @@ class CodegenContext {
   val equivalentExpressions: EquivalentExpressions = new EquivalentExpressions
 
   // Foreach expression that is participating in subexpression elimination, the state to use.
-  val subExprEliminationExprs = mutable.HashMap.empty[Expression, SubExprEliminationState]
+  var subExprEliminationExprs = Map.empty[Expression, SubExprEliminationState]
 
   // The collection of sub-expression result resetting methods that need to be called on each row.
   val subexprFunctions = mutable.ArrayBuffer.empty[String]
@@ -564,14 +564,9 @@ class CodegenContext {
     } else {
       s"${freshNamePrefix}_$name"
     }
-    if (freshNameIds.contains(fullName)) {
-      val id = freshNameIds(fullName)
-      freshNameIds(fullName) = id + 1
-      s"$fullName$id"
-    } else {
-      freshNameIds += fullName -> 1
-      fullName
-    }
+    val id = freshNameIds.getOrElse(fullName, 0)
+    freshNameIds(fullName) = id + 1
+    s"${fullName}_$id"
   }
 
   /**
@@ -769,8 +764,10 @@ class CodegenContext {
    */
   def genEqual(dataType: DataType, c1: String, c2: String): String = dataType match {
     case BinaryType => s"java.util.Arrays.equals($c1, $c2)"
-    case FloatType => s"(java.lang.Float.isNaN($c1) && java.lang.Float.isNaN($c2)) || $c1 == $c2"
-    case DoubleType => s"(java.lang.Double.isNaN($c1) && java.lang.Double.isNaN($c2)) || $c1 == $c2"
+    case FloatType =>
+      s"((java.lang.Float.isNaN($c1) && java.lang.Float.isNaN($c2)) || $c1 == $c2)"
+    case DoubleType =>
+      s"((java.lang.Double.isNaN($c1) && java.lang.Double.isNaN($c2)) || $c1 == $c2)"
     case dt: DataType if isPrimitiveType(dt) => s"$c1 == $c2"
     case dt: DataType if dt.isInstanceOf[AtomicType] => s"$c1.equals($c2)"
     case array: ArrayType => genComp(array, c1, c2) + " == 0"
@@ -1118,14 +1115,12 @@ class CodegenContext {
       newSubExprEliminationExprs: Map[Expression, SubExprEliminationState])(
       f: => Seq[ExprCode]): Seq[ExprCode] = {
     val oldsubExprEliminationExprs = subExprEliminationExprs
-    subExprEliminationExprs.clear
-    newSubExprEliminationExprs.foreach(subExprEliminationExprs += _)
+    subExprEliminationExprs = newSubExprEliminationExprs
 
     val genCodes = f
 
     // Restore previous subExprEliminationExprs
-    subExprEliminationExprs.clear
-    oldsubExprEliminationExprs.foreach(subExprEliminationExprs += _)
+    subExprEliminationExprs = oldsubExprEliminationExprs
     genCodes
   }
 
@@ -1139,7 +1134,7 @@ class CodegenContext {
   def subexpressionEliminationForWholeStageCodegen(expressions: Seq[Expression]): SubExprCodes = {
     // Create a clear EquivalentExpressions and SubExprEliminationState mapping
     val equivalentExpressions: EquivalentExpressions = new EquivalentExpressions
-    val subExprEliminationExprs = mutable.HashMap.empty[Expression, SubExprEliminationState]
+    val localSubExprEliminationExprs = mutable.HashMap.empty[Expression, SubExprEliminationState]
 
     // Add each expression tree and compute the common subexpressions.
     expressions.foreach(equivalentExpressions.addExprTree)
@@ -1152,10 +1147,10 @@ class CodegenContext {
       // Generate the code for this expression tree.
       val eval = expr.genCode(this)
       val state = SubExprEliminationState(eval.isNull, eval.value)
-      e.foreach(subExprEliminationExprs.put(_, state))
+      e.foreach(localSubExprEliminationExprs.put(_, state))
       eval.code.trim
     }
-    SubExprCodes(codes, subExprEliminationExprs.toMap)
+    SubExprCodes(codes, localSubExprEliminationExprs.toMap)
   }
 
   /**
@@ -1203,7 +1198,7 @@ class CodegenContext {
 
       subexprFunctions += s"${addNewFunction(fnName, fn)}($INPUT_ROW);"
       val state = SubExprEliminationState(isNull, value)
-      e.foreach(subExprEliminationExprs.put(_, state))
+      subExprEliminationExprs ++= e.map(_ -> state).toMap
     }
   }
 
@@ -1253,14 +1248,15 @@ class CodegenContext {
    */
   def calculateParamLength(params: Seq[Expression]): Int = {
     def paramLengthForExpr(input: Expression): Int = {
-      // For a nullable expression, we need to pass in an extra boolean parameter.
-      (if (input.nullable) 1 else 0) + javaType(input.dataType) match {
+      val javaParamLength = javaType(input.dataType) match {
         case JAVA_LONG | JAVA_DOUBLE => 2
         case _ => 1
       }
+      // For a nullable expression, we need to pass in an extra boolean parameter.
+      (if (input.nullable) 1 else 0) + javaParamLength
     }
     // Initial value is 1 for `this`.
-    1 + params.map(paramLengthForExpr(_)).sum
+    1 + params.map(paramLengthForExpr).sum
   }
 
   /**

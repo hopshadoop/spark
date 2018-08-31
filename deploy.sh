@@ -19,7 +19,7 @@
 
 set -e
 
-VERSION=2.3.0
+VERSION=2.3.1
 HADOOP_PROFILE=2.8
 NAME=without-hadoop-with-hive-with-r
 #HADOOP_VERSION=2.7.3

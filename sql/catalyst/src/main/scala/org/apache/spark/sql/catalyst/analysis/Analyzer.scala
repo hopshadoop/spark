@@ -18,6 +18,7 @@
 package org.apache.spark.sql.catalyst.analysis
 
 import scala.collection.mutable.ArrayBuffer
+import scala.util.Random
 
 import org.apache.spark.sql.AnalysisException
 import org.apache.spark.sql.catalyst._
@@ -177,6 +178,7 @@ class Analyzer(
       TimeWindowing ::
       ResolveInlineTables(conf) ::
       ResolveTimeZone(conf) ::
+      ResolvedUuidExpressions ::
       TypeCoercion.typeCoercionRules(conf) ++
       extendedResolutionRules : _*),
     Batch("Post-Hoc Resolution", Once, postHocResolutionRules: _*),
@@ -659,13 +661,13 @@ class Analyzer(
       try {
         catalog.lookupRelation(tableIdentWithDb)
       } catch {
-        case _: NoSuchTableException =>
-          u.failAnalysis(s"Table or view not found: ${tableIdentWithDb.unquotedString}")
+        case e: NoSuchTableException =>
+          u.failAnalysis(s"Table or view not found: ${tableIdentWithDb.unquotedString}", e)
         // If the database is defined and that database is not found, throw an AnalysisException.
         // Note that if the database is not defined, it is possible we are looking up a temp view.
         case e: NoSuchDatabaseException =>
           u.failAnalysis(s"Table or view not found: ${tableIdentWithDb.unquotedString}, the " +
-            s"database ${e.db} doesn't exist.")
+            s"database ${e.db} doesn't exist.", e)
       }
     }
 
@@ -1991,6 +1993,20 @@ class Analyzer(
           e -> ne
         }
       }.toMap
+    }
+  }
+
+  /**
+   * Set the seed for random number generation in Uuid expressions.
+   */
+  object ResolvedUuidExpressions extends Rule[LogicalPlan] {
+    private lazy val random = new Random()
+
+    override def apply(plan: LogicalPlan): LogicalPlan = plan.transformUp {
+      case p if p.resolved => p
+      case p => p transformExpressionsUp {
+        case Uuid(None) => Uuid(Some(random.nextLong()))
+      }
     }
   }
 

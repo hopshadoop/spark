@@ -22,6 +22,7 @@ import java.lang.reflect.{InvocationTargetException, Modifier, UndeclaredThrowab
 import java.net.URL
 import java.security.PrivilegedExceptionAction
 import java.text.ParseException
+import java.util.UUID
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, HashMap, Map}
@@ -245,6 +246,19 @@ object SparkSubmit extends CommandLineUtils with Logging {
       args: SparkSubmitArguments,
       conf: Option[HadoopConfiguration] = None)
       : (Seq[String], Seq[String], SparkConf, String) = {
+    try {
+      doPrepareSubmitEnvironment(args, conf)
+    } catch {
+      case e: SparkException =>
+        printErrorAndExit(e.getMessage)
+        throw e
+    }
+  }
+
+  private def doPrepareSubmitEnvironment(
+      args: SparkSubmitArguments,
+      conf: Option[HadoopConfiguration] = None)
+      : (Seq[String], Seq[String], SparkConf, String) = {
     // Return values
     val childArgs = new ArrayBuffer[String]()
     val childClasspath = new ArrayBuffer[String]()
@@ -348,7 +362,8 @@ object SparkSubmit extends CommandLineUtils with Logging {
       // Resolve maven dependencies if there are any and add classpath to jars. Add them to py-files
       // too for packages that include Python code
       val resolvedMavenCoordinates = DependencyUtils.resolveMavenDependencies(
-        args.packagesExclusions, args.packages, args.repositories, args.ivyRepoPath)
+        args.packagesExclusions, args.packages, args.repositories, args.ivyRepoPath,
+        args.ivySettingsPath)
 
       if (!StringUtils.isBlank(resolvedMavenCoordinates)) {
         args.jars = mergeFileLists(args.jars, resolvedMavenCoordinates)
@@ -1197,7 +1212,33 @@ private[spark] object SparkSubmitUtils {
 
   /** A nice function to use in tests as well. Values are dummy strings. */
   def getModuleDescriptor: DefaultModuleDescriptor = DefaultModuleDescriptor.newDefaultInstance(
-    ModuleRevisionId.newInstance("org.apache.spark", "spark-submit-parent", "1.0"))
+    // Include UUID in module name, so multiple clients resolving maven coordinate at the same time
+    // do not modify the same resolution file concurrently.
+    ModuleRevisionId.newInstance("org.apache.spark",
+      s"spark-submit-parent-${UUID.randomUUID.toString}",
+      "1.0"))
+
+  /**
+   * Clear ivy resolution from current launch. The resolution file is usually at
+   * ~/.ivy2/org.apache.spark-spark-submit-parent-$UUID-default.xml,
+   * ~/.ivy2/resolved-org.apache.spark-spark-submit-parent-$UUID-1.0.xml, and
+   * ~/.ivy2/resolved-org.apache.spark-spark-submit-parent-$UUID-1.0.properties.
+   * Since each launch will have its own resolution files created, delete them after
+   * each resolution to prevent accumulation of these files in the ivy cache dir.
+   */
+  private def clearIvyResolutionFiles(
+      mdId: ModuleRevisionId,
+      ivySettings: IvySettings,
+      ivyConfName: String): Unit = {
+    val currentResolutionFiles = Seq(
+      s"${mdId.getOrganisation}-${mdId.getName}-$ivyConfName.xml",
+      s"resolved-${mdId.getOrganisation}-${mdId.getName}-${mdId.getRevision}.xml",
+      s"resolved-${mdId.getOrganisation}-${mdId.getName}-${mdId.getRevision}.properties"
+    )
+    currentResolutionFiles.foreach { filename =>
+      new File(ivySettings.getDefaultCache, filename).delete()
+    }
+  }
 
   /**
    * Resolves any dependencies that were supplied through maven coordinates
@@ -1248,14 +1289,6 @@ private[spark] object SparkSubmitUtils {
 
         // A Module descriptor must be specified. Entries are dummy strings
         val md = getModuleDescriptor
-        // clear ivy resolution from previous launches. The resolution file is usually at
-        // ~/.ivy2/org.apache.spark-spark-submit-parent-default.xml. In between runs, this file
-        // leads to confusion with Ivy when the files can no longer be found at the repository
-        // declared in that file/
-        val mdId = md.getModuleRevisionId
-        val previousResolution = new File(ivySettings.getDefaultCache,
-          s"${mdId.getOrganisation}-${mdId.getName}-$ivyConfName.xml")
-        if (previousResolution.exists) previousResolution.delete
 
         md.setDefaultConf(ivyConfName)
 
@@ -1276,7 +1309,10 @@ private[spark] object SparkSubmitUtils {
           packagesDirectory.getAbsolutePath + File.separator +
             "[organization]_[artifact]-[revision](-[classifier]).[ext]",
           retrieveOptions.setConfs(Array(ivyConfName)))
-        resolveDependencyPaths(rr.getArtifacts.toArray, packagesDirectory)
+        val paths = resolveDependencyPaths(rr.getArtifacts.toArray, packagesDirectory)
+        val mdId = md.getModuleRevisionId
+        clearIvyResolutionFiles(mdId, ivySettings, ivyConfName)
+        paths
       } finally {
         System.setOut(sysOut)
       }

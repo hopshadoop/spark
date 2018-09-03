@@ -71,7 +71,7 @@ private[hive] object IsolatedClientLoader extends Logging {
               "It is recommended to set jars used by Hive metastore client through " +
               "spark.sql.hive.metastore.jars in the production environment.")
             _sharesHadoopClasses = false
-            (downloadVersion(resolvedVersion, "2.6.5", ivyPath), "2.6.5")
+            (downloadVersion(resolvedVersion, "2.8.2.5-SNAPSHOT", ivyPath), "2.8.2.5-SNAPSHOT")
         }
       resolvedVersions.put((resolvedVersion, actualHadoopVersion), downloadedFiles)
       resolvedVersions((resolvedVersion, actualHadoopVersion))

@@ -42,6 +42,7 @@ private[deploy] class ClientArguments(args: Array[String]) {
   var supervise: Boolean = DEFAULT_SUPERVISE
   var memory: Int = DEFAULT_MEMORY
   var cores: Int = DEFAULT_CORES
+  var gpus: Int = DEFAULT_GPUS
   private var _driverOptions = ListBuffer[String]()
   def driverOptions: Seq[String] = _driverOptions.toSeq
 
@@ -58,6 +59,10 @@ private[deploy] class ClientArguments(args: Array[String]) {
 
     case ("--memory" | "-m") :: MemoryParam(value) :: tail =>
       memory = value
+      parse(tail)
+
+    case ("--gpus" | "-g") :: IntParam(value) :: tail =>
+      gpus = value
       parse(tail)
 
     case ("--supervise" | "-s") :: tail =>
@@ -111,6 +116,7 @@ private[deploy] class ClientArguments(args: Array[String]) {
       |Options:
       |   -c CORES, --cores CORES        Number of cores to request (default: $DEFAULT_CORES)
       |   -m MEMORY, --memory MEMORY     Megabytes of memory to request (default: $DEFAULT_MEMORY)
+      |   -g MEMORY, --gpus GPUS         Number of gpus to request of memory to request (default: $DEFAULT_GPUS)
       |   -s, --supervise                Whether to restart the driver on failure
       |                                  (default: $DEFAULT_SUPERVISE)
       |   -v, --verbose                  Print more debugging output
@@ -124,6 +130,7 @@ private[deploy] class ClientArguments(args: Array[String]) {
 
 private[deploy] object ClientArguments {
   val DEFAULT_CORES = 1
+  val DEFAULT_GPUS = 0
   val DEFAULT_MEMORY = Utils.DEFAULT_DRIVER_MEM_MB // MB
   val DEFAULT_SUPERVISE = false
 

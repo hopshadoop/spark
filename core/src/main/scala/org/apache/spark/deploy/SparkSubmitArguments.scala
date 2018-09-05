@@ -81,6 +81,7 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
   // Standalone cluster mode only
   var supervise: Boolean = false
   var driverCores: String = null
+  var driverGpus: String = null
   var submissionToKill: String = null
   var submissionToRequestStatusFor: String = null
   var useRest: Boolean = true // used internally
@@ -172,6 +173,9 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
       .orNull
     driverCores = Option(driverCores)
       .orElse(sparkProperties.get("spark.driver.cores"))
+      .orNull
+    driverGpus = Option(driverGpus)
+      .orElse(sparkProperties.get("spark.driver.gpus"))
       .orNull
     executorMemory = Option(executorMemory)
       .orElse(sparkProperties.get("spark.executor.memory"))
@@ -348,6 +352,7 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
     |  propertiesFile          $propertiesFile
     |  driverMemory            $driverMemory
     |  driverCores             $driverCores
+    |  driverGpus              $driverGpus
     |  driverExtraClassPath    $driverExtraClassPath
     |  driverExtraLibraryPath  $driverExtraLibraryPath
     |  driverExtraJavaOptions  $driverExtraJavaOptions
@@ -413,6 +418,9 @@ private[deploy] class SparkSubmitArguments(args: Seq[String], env: Map[String, S
 
       case DRIVER_CORES =>
         driverCores = value
+
+      case DRIVER_GPUS =>
+        driverGpus = value
 
       case DRIVER_CLASS_PATH =>
         driverExtraClassPath = value

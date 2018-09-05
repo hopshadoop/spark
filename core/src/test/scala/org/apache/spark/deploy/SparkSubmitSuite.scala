@@ -224,6 +224,7 @@ class SparkSubmitSuite
       "--class", "org.SomeClass",
       "--jars", "one.jar,two.jar,three.jar",
       "--driver-memory", "4g",
+      "--driver-gpus", "4",
       "--queue", "thequeue",
       "--files", "file1.txt,file2.txt",
       "--archives", "archive1.txt,archive2.txt",
@@ -248,6 +249,7 @@ class SparkSubmitSuite
 
     conf.get("spark.executor.memory") should be ("5g")
     conf.get("spark.driver.memory") should be ("4g")
+    conf.get("spark.driver.gpus") should be ("4")
     conf.get("spark.executor.cores") should be ("5")
     conf.get("spark.yarn.queue") should be ("thequeue")
     conf.get("spark.yarn.dist.jars") should include regex (".*one.jar,.*two.jar,.*three.jar")
@@ -317,6 +319,7 @@ class SparkSubmitSuite
       "--supervise",
       "--driver-memory", "4g",
       "--driver-cores", "5",
+      "--driver-gpus", "5",
       "--conf", "spark.ui.enabled=false",
       "thejar.jar",
       "arg1", "arg2")
@@ -328,7 +331,7 @@ class SparkSubmitSuite
       childArgsStr should endWith ("thejar.jar org.SomeClass arg1 arg2")
       mainClass should be (SparkSubmit.REST_CLUSTER_SUBMIT_CLASS)
     } else {
-      childArgsStr should startWith ("--supervise --memory 4g --cores 5")
+      childArgsStr should startWith ("--supervise --memory 4g --cores 5 --gpus 5")
       childArgsStr should include regex "launch spark://h:p .*thejar.jar org.SomeClass arg1 arg2"
       mainClass should be (SparkSubmit.STANDALONE_CLUSTER_SUBMIT_CLASS)
     }
@@ -340,6 +343,7 @@ class SparkSubmitSuite
     confMap.keys should contain ("spark.app.name")
     confMap.keys should contain ("spark.jars")
     confMap.keys should contain ("spark.driver.memory")
+    confMap.keys should contain ("spark.driver.gpus")
     confMap.keys should contain ("spark.driver.cores")
     confMap.keys should contain ("spark.driver.supervise")
     confMap.keys should contain ("spark.ui.enabled")
@@ -355,6 +359,7 @@ class SparkSubmitSuite
       "--total-executor-cores", "5",
       "--class", "org.SomeClass",
       "--driver-memory", "4g",
+      "--driver-gpus", "4",
       "--conf", "spark.ui.enabled=false",
       "thejar.jar",
       "arg1", "arg2")
@@ -414,6 +419,7 @@ class SparkSubmitSuite
     conf.get("spark.master") should be ("k8s://https://host:port")
     conf.get("spark.executor.memory") should be ("5g")
     conf.get("spark.driver.memory") should be ("4g")
+    conf.get("spark.driver.gpus") should be ("4")
     conf.get("spark.kubernetes.namespace") should be ("spark")
     conf.get("spark.kubernetes.driver.container.image") should be ("bar")
   }

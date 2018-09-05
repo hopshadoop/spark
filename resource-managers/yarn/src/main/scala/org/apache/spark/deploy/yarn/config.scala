@@ -201,6 +201,10 @@ package object config {
     .intConf
     .createWithDefault(1)
 
+  private[spark] val AM_GPUS = ConfigBuilder("spark.yarn.am.gpus")
+    .intConf
+    .createWithDefault(0)
+
   private[spark] val AM_JAVA_OPTIONS = ConfigBuilder("spark.yarn.am.extraJavaOptions")
     .doc("Extra Java options for the client-mode AM.")
     .stringConf
@@ -224,6 +228,12 @@ package object config {
   private[spark] val DRIVER_CORES = ConfigBuilder("spark.driver.cores")
     .intConf
     .createWithDefault(1)
+
+  /* Driver configuration. */
+
+  private[spark] val DRIVER_GPUS = ConfigBuilder("spark.driver.gpus")
+    .intConf
+    .createWithDefault(0)
 
   /* Executor configuration. */
 

@@ -128,6 +128,14 @@ To use a custom metrics.properties for the application master and executors, upd
   </td>
 </tr>
 <tr>
+  <td><code>spark.yarn.am.gpus</code></td>
+  <td><code>1</code></td>
+  <td>
+    Number of gpus to use for the YARN Application Master in client mode.
+    In cluster mode, use <code>spark.driver.gpus</code> instead.
+  </td>
+</tr>
+<tr>
   <td><code>spark.yarn.am.waitTime</code></td>
   <td><code>100s</code></td>
   <td>

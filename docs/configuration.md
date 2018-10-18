@@ -137,6 +137,13 @@ of the most common options to set are:
   </td>
 </tr>
 <tr>
+  <td><code>spark.driver.gpus</code></td>
+  <td>1</td>
+  <td>
+    Number of gpus to use for the driver process, only in cluster mode.
+  </td>
+</tr>
+<tr>
   <td><code>spark.driver.maxResultSize</code></td>
   <td>1g</td>
   <td>

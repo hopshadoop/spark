@@ -85,6 +85,11 @@ private[spark] class Client(
   } else {
     sparkConf.get(AM_CORES)
   }
+  private val amGpus = if (isClusterMode) {
+    sparkConf.get(DRIVER_GPUS)
+  } else {
+    sparkConf.get(AM_GPUS)
+  }
 
   // Executor related configurations
   private val executorMemory = sparkConf.get(EXECUTOR_MEMORY)
@@ -247,6 +252,7 @@ private[spark] class Client(
     val capability = Records.newRecord(classOf[Resource])
     capability.setMemory(amMemory + amMemoryOverhead)
     capability.setVirtualCores(amCores)
+    capability.setGPUs(amGpus)
 
     sparkConf.get(AM_NODE_LABEL_EXPRESSION) match {
       case Some(expr) =>

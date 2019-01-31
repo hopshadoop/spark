@@ -58,11 +58,12 @@ private[spark] object HiveUtils extends Logging {
   }
 
   /** The version of hive used internally by Spark SQL. */
-  val builtinHiveVersion: String = "2.3.0.2"
+  val builtinHiveVersion: String = "3.0.1"
 
   val HIVE_METASTORE_VERSION = buildConf("spark.sql.hive.metastore.version")
     .doc("Version of the Hive metastore. Available options are " +
-        s"<code>0.12.0</code> through <code>2.3.3</code>.")
+        "<code>0.12.0</code> through <code>2.3.4</code> and " +
+        "<code>3.1.0</code> through <code>3.1.1</code>.")
     .stringConf
     .createWithDefault(builtinHiveVersion)
 

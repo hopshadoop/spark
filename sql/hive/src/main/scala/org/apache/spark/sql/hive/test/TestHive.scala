@@ -24,16 +24,15 @@ import java.util.{Set => JavaSet}
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.language.implicitConversions
-
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
+import org.apache.hadoop.hive.metastore.conf.MetastoreConf
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry
 import org.apache.hadoop.hive.serde2.`lazy`.LazySimpleSerDe
-
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{SparkSession, SQLContext}
+import org.apache.spark.sql.{SQLContext, SparkSession}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog.{ExternalCatalog, ExternalCatalogWithListener}
 import org.apache.spark.sql.catalyst.optimizer.ConvertToLocalRelation
@@ -42,7 +41,7 @@ import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
 import org.apache.spark.sql.execution.command.CacheTableCommand
 import org.apache.spark.sql.hive._
 import org.apache.spark.sql.hive.client.HiveClient
-import org.apache.spark.sql.internal.{SessionState, SharedState, SQLConf, WithTestConf}
+import org.apache.spark.sql.internal.{SQLConf, SessionState, SharedState, WithTestConf}
 import org.apache.spark.sql.internal.StaticSQLConf.CATALOG_IMPLEMENTATION
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
@@ -188,6 +187,12 @@ private[hive] class TestHiveSparkSession(
   { // set the metastore temporary configuration
     val metastoreTempConf = HiveUtils.newTemporaryConfiguration(useInMemoryDerby = false) ++ Map(
       ConfVars.METASTORE_INTEGER_JDO_PUSHDOWN.varname -> "true",
+
+      // Enable schema creation for testing
+      MetastoreConf.ConfVars.AUTO_CREATE_COLUMNS.getVarname -> "true",
+      MetastoreConf.ConfVars.AUTO_CREATE_TABLES.getVarname -> "true",
+      MetastoreConf.ConfVars.AUTO_CREATE_SCHEMA.getVarname -> "true",
+
       // scratch directory used by Hive's metastore client
       ConfVars.SCRATCHDIR.varname -> TestHiveContext.makeScratchDir().toURI.toString,
       ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname -> "1") ++

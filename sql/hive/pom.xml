@@ -111,7 +111,7 @@
     </dependency>
     <dependency>
       <groupId>${hive.group}</groupId>
-      <artifactId>hive-metastore</artifactId>
+      <artifactId>hive-standalone-metastore</artifactId>
     </dependency>
     <!--
         <dependency>

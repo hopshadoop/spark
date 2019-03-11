@@ -35,7 +35,9 @@ private[client] abstract class HiveVersionSuite(version: String) extends SparkFu
     // hive.metastore.schema.verification from false to true since 2.0
     // For details, see the JIRA HIVE-6113 and HIVE-12463
     if (version == "2.0" || version == "2.1" || version == "2.2" || version == "2.3") {
-      hadoopConf.set("datanucleus.schema.autoCreateAll", "true")
+      hadoopConf.set("datanucleus.schema.autoCreateSchema", "true")
+      hadoopConf.set("datanucleus.schema.autoCreateTables", "true")
+      hadoopConf.set("datanucleus.schema.autoCreateColumns", "true")
       hadoopConf.set("hive.metastore.schema.verification", "false")
     }
     HiveClientBuilder.buildClient(

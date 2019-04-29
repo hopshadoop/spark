@@ -51,6 +51,21 @@
 </property>
 
 <property>
+  <name>datanucleus.schema.autoCreateSchema</name>
+  <value>true</value>
+</property>
+
+<property>
+  <name>datanucleus.schema.autoCreateTables</name>
+  <value>true</value>
+</property>
+
+<property>
+  <name>datanucleus.schema.autoCreateColumns</name>
+  <value>true</value>
+</property>
+
+<property>
   <name>hive.metastore.schema.verification</name>
   <value>false</value>
 </property>
@@ -88,15 +103,14 @@
 </property>
 
 <property>
-  <!--  this should eventually be deprecated since the metastore should supply this -->
-  <name>hive.metastore.warehouse.dir</name>
-  <value>${test.warehouse.dir}</value>
+  <name>test.log.dir</name>
+  <value>${test.tmp.dir}/log/</value>
   <description></description>
 </property>
 
 <property>
-  <name>test.log.dir</name>
-  <value>${test.tmp.dir}/log/</value>
+  <name>hive.metastore.warehouse.dir</name>
+  <value>${test.tmp.dir}/warehouse/</value>
   <description></description>
 </property>
 

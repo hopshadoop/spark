@@ -132,13 +132,15 @@ class VersionsSuite extends SparkFunSuite with Logging {
 
       if (version == "2.0" || version == "2.1" || version == "2.2" || version == "2.3" ||
           version == "3.0") {
+        // Fabio: disable metadata consistency for unit tests.
+        hadoopConf.set("hops.metadata.consistent", "false")
         hadoopConf.set("datanucleus.schema.autoCreateSchema", "true")
         hadoopConf.set("datanucleus.schema.autoCreateTables", "true")
         hadoopConf.set("datanucleus.schema.autoCreateColumns", "true")
         hadoopConf.set("hive.metastore.schema.verification", "false")
       }
       // Since Hive 3.0, HIVE-19310 skipped `ensureDbInit` if `hive.in.test=false`.
-      if (version == "3.1") {
+      if (version == "3.1" || version == "3.0") {
         hadoopConf.set("hive.in.test", "true")
       }
       client = buildClient(version, hadoopConf, HiveUtils.formatTimeVarsForHiveClient(hadoopConf))
@@ -308,7 +310,7 @@ class VersionsSuite extends SparkFunSuite with Logging {
     }
 
     test(s"$version: dropTable") {
-      val versionsWithoutPurge = versions.takeWhile(_ != "0.14")
+      val versionsWithoutPurge = versions.takeWhile(_ != "3.0")
       // First try with the purge option set. This should fail if the version is < 0.14, in which
       // case we check the version and try without it.
       try {
@@ -436,7 +438,8 @@ class VersionsSuite extends SparkFunSuite with Logging {
         numDP = 1)
     }
 
-    test(s"$version: renamePartitions") {
+    // Fabio: we don't allow renames in HopsHive
+    ignore(s"$version: renamePartitions") {
       val oldSpec = Map("key1" -> "1", "key2" -> "1")
       val newSpec = Map("key1" -> "1", "key2" -> "3")
       client.renamePartitions("default", "src_part", Seq(oldSpec), Seq(newSpec))
@@ -463,7 +466,7 @@ class VersionsSuite extends SparkFunSuite with Logging {
 
     test(s"$version: dropPartitions") {
       val spec = Map("key1" -> "1", "key2" -> "3")
-      val versionsWithoutPurge = versions.takeWhile(_ != "1.2")
+      val versionsWithoutPurge = versions.takeWhile(_ != "3.0")
       // Similar to dropTable; try with purge set, and if it fails, make sure we're running
       // with a version that is older than the minimum (1.2 in this case).
       try {

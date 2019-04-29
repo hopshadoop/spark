@@ -21,6 +21,7 @@ import org.apache.hadoop.hive.ql.io.sarg.PredicateLeaf
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgument.Builder
 import org.apache.hadoop.hive.ql.io.sarg.SearchArgumentFactory.newBuilder
+import org.apache.hadoop.hive.serde2.io.HiveDecimalWritable
 
 import org.apache.spark.internal.Logging
 import org.apache.spark.sql.execution.datasources.orc.OrcFilters.buildTree
@@ -98,6 +99,15 @@ private[orc] object OrcFilters extends Logging {
       case _: DecimalType => PredicateLeaf.Type.DECIMAL
     }
 
+    def boxValue(value : Any, dataType: DataType) : Any = dataType match {
+      case ByteType => value.asInstanceOf[Byte].toLong
+      case ShortType => value.asInstanceOf[Short].toLong
+      case IntegerType => value.asInstanceOf[Int].toLong
+      case FloatType => value.asInstanceOf[Float].toDouble
+      case _: DecimalType => new HiveDecimalWritable(value.toString)
+      case _ => value
+    }
+
     expression match {
       case And(left, right) =>
         // At here, it is not safe to just convert one side if we do not understand the
@@ -135,32 +145,32 @@ private[orc] object OrcFilters extends Logging {
       case EqualTo(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startAnd().equals(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          value).end())
+          boxValue(value, dataTypeMap(attribute))).end())
 
       case EqualNullSafe(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startAnd().nullSafeEquals(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          value).end())
+          boxValue(value, dataTypeMap(attribute))).end())
 
       case LessThan(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startAnd().lessThan(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          value).end())
+          boxValue(value, dataTypeMap(attribute))).end())
 
       case LessThanOrEqual(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startAnd().lessThanEquals(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          value).end())
+          boxValue(value, dataTypeMap(attribute))).end())
 
       case GreaterThan(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startNot().lessThanEquals(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          value).end())
+          boxValue(value, dataTypeMap(attribute))).end())
 
       case GreaterThanOrEqual(attribute, value) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startNot().lessThan(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          value).end())
+          boxValue(value, dataTypeMap(attribute))).end())
 
       case IsNull(attribute) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startAnd().isNull(attribute,
@@ -173,7 +183,7 @@ private[orc] object OrcFilters extends Logging {
       case In(attribute, values) if isSearchableType(dataTypeMap(attribute)) =>
         Some(builder.startAnd().in(attribute,
           predicateLeafType(dataTypeMap(attribute)),
-          values.map(_.asInstanceOf[AnyRef]): _*).end())
+          values.map(boxValue(_, dataTypeMap(attribute)).asInstanceOf[Object]): _*).end())
 
       case _ => None
     }

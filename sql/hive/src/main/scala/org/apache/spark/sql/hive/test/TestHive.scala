@@ -19,20 +19,23 @@ package org.apache.spark.sql.hive.test
 
 import java.io.File
 import java.net.URI
+import java.sql.{Driver, DriverManager}
 import java.util.{Set => JavaSet}
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.language.implicitConversions
+
 import org.apache.hadoop.conf.Configuration
 import org.apache.hadoop.fs.Path
 import org.apache.hadoop.hive.conf.HiveConf.ConfVars
 import org.apache.hadoop.hive.metastore.conf.MetastoreConf
 import org.apache.hadoop.hive.ql.exec.FunctionRegistry
 import org.apache.hadoop.hive.serde2.`lazy`.LazySimpleSerDe
+
 import org.apache.spark.{SparkConf, SparkContext}
 import org.apache.spark.internal.Logging
-import org.apache.spark.sql.{SQLContext, SparkSession}
+import org.apache.spark.sql.{SparkSession, SQLContext}
 import org.apache.spark.sql.catalyst.analysis.UnresolvedRelation
 import org.apache.spark.sql.catalyst.catalog.{ExternalCatalog, ExternalCatalogWithListener}
 import org.apache.spark.sql.catalyst.optimizer.ConvertToLocalRelation
@@ -41,7 +44,7 @@ import org.apache.spark.sql.execution.{QueryExecution, SQLExecution}
 import org.apache.spark.sql.execution.command.CacheTableCommand
 import org.apache.spark.sql.hive._
 import org.apache.spark.sql.hive.client.HiveClient
-import org.apache.spark.sql.internal.{SQLConf, SessionState, SharedState, WithTestConf}
+import org.apache.spark.sql.internal.{SessionState, SharedState, SQLConf, WithTestConf}
 import org.apache.spark.sql.internal.StaticSQLConf.CATALOG_IMPLEMENTATION
 import org.apache.spark.util.{ShutdownHookManager, Utils}
 
@@ -195,6 +198,7 @@ private[hive] class TestHiveSparkSession(
 
       // scratch directory used by Hive's metastore client
       ConfVars.SCRATCHDIR.varname -> TestHiveContext.makeScratchDir().toURI.toString,
+      ConfVars.METASTOREWAREHOUSE.varname -> TestHiveContext.makeWarehouseDir().toURI.toString,
       ConfVars.METASTORE_CLIENT_CONNECT_RETRY_DELAY.varname -> "1") ++
       // After session cloning, the JDBC connect string for a JDBC metastore should not be changed.
       existingSharedState.map { state =>
@@ -206,6 +210,11 @@ private[hive] class TestHiveSparkSession(
     metastoreTempConf.foreach { case (k, v) =>
       sc.hadoopConfiguration.set(k, v)
     }
+
+    // Load the Metastore Driver
+    val metastoreDriver = Utils.classForName(sc.hadoopConfiguration.get(
+      MetastoreConf.ConfVars.CONNECTION_DRIVER.getVarname)).newInstance().asInstanceOf[Driver]
+    DriverManager.registerDriver(metastoreDriver)
   }
 
   assume(sc.conf.get(CATALOG_IMPLEMENTATION) == "hive")
